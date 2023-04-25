@@ -490,6 +490,64 @@ func TestLoadConfigFile(t *testing.T) {
 	}
 }
 
+func TestLoadConfigFile_Env_Injection(t *testing.T) {
+	envVars := map[string]string{
+		"VAULT_AWS_MOUNTPATH": "auth/aws",
+		"VAULT_NAMESPACE": "ns1",
+		"VAULT_AWS_ROLE": "foobar",
+		"VAULT_SINK_PATH": "/tmp/file-foo",
+		"VAULT_INNER": "inner-val",
+		"VAULT_ITEM": "item2",
+	}
+	for k, v := range envVars {
+		defer os.Unsetenv(k)
+		os.Setenv(k, v)
+	}
+
+	config, err := LoadConfigFile("./test-fixtures/config-env-variables.hcl")
+	if err != nil {
+		t.Fatalf("err: %s", err)
+	}
+
+	expected := &Config{
+		SharedConfig: &configutil.SharedConfig{
+			PidFile: "./pidfile",
+		},
+		AutoAuth: &AutoAuth{
+			Method: &Method{
+				Type:      "aws",
+				MountPath: "auth/aws",
+				Namespace: "ns1/",
+				Config: map[string]interface{}{
+					"role":   "foobar",
+					"type":   "iam",
+					"region": "eu-west-1",
+					"test": map[string]interface{} {
+						"inner": "inner-val",
+					},
+				},
+			},
+			Sinks: []*Sink{
+				{
+					Type: "file",
+					DHType: "curve25519",
+					DHPath: "/tmp/file-foo-dhpath",
+					AAD:    "foobar",
+					Config: map[string]interface{}{
+						"path": "/tmp/file-foo",
+						"test": []interface{}{"item1", "item2"},
+					},
+				},
+			},
+		},
+	}
+
+	config.Prune()
+	if diff := deep.Equal(config, expected); diff != nil {
+		t.Fatal(diff)
+	}
+}
+
 func TestLoadConfigFile_Method_Wrapping(t *testing.T) {
 	config, err := LoadConfigFile("./test-fixtures/config-method-wrapping.hcl")
 	if err != nil {

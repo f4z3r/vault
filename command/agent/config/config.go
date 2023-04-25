@@ -849,6 +849,7 @@ func parseMethod(result *Config, list *ast.ObjectList) error {
 		}
 	}
 
+	m.MountPath = os.ExpandEnv(m.MountPath)
 	// Default to Vault's default
 	if m.MountPath == "" {
 		m.MountPath = fmt.Sprintf("auth/%s", m.Type)
@@ -864,7 +865,27 @@ func parseMethod(result *Config, list *ast.ObjectList) error {
 		m.WrapTTLRaw = nil
 	}
 
+	for k, v := range m.Config {
+		val, ok := v.(string)
+		if ok {
+			m.Config[k] = os.ExpandEnv(val)
+		}
+		list, ok := v.([]string)
+		if ok {
+			for idx, val := range list {
+				list[idx] = os.ExpandEnv(val)
+			}
+		}
+		obj, ok := v.(map[interface{}]string)
+		if ok {
+			for key, val := range obj {
+				obj[key] = os.ExpandEnv(val)
+			}
+		}
+	}
+
 	// Canonicalize namespace path if provided
+	m.Namespace = os.ExpandEnv(m.Namespace)
 	m.Namespace = namespace.Canonicalize(m.Namespace)
 
 	result.AutoAuth.Method = &m
@@ -929,6 +950,24 @@ func parseSinks(result *Config, list *ast.ObjectList) error {
 			return multierror.Prefix(errors.New("'dh_type' and 'dh_path' must be specified together"), fmt.Sprintf("sink.%s", s.Type))
 		}
 
+		for k, v := range s.Config {
+			val, ok := v.(string)
+			if ok {
+				s.Config[k] = os.ExpandEnv(val)
+			}
+			list, ok := v.([]string)
+			if ok {
+				for idx, val := range list {
+					list[idx] = os.ExpandEnv(val)
+				}
+			}
+			obj, ok := v.(map[interface{}]string)
+			if ok {
+				for key, val := range obj {
+					obj[key] = os.ExpandEnv(val)
+				}
+			}
+		}
 		ts = append(ts, &s)
 	}
 
